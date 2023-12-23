@@ -1,0 +1,14 @@
+postgres:
+  PostgresqlHost: localhost
+  PostgresqlPort: 5432
+  PostgresqlUser: postgres
+  PostgresqlPassword: password
+  PostgresqlDbname: database
+
+metric:
+  jaeger:
+    endpoint: http://localhost:14268/api/traces
+
+app:
+  port: 3999
+
