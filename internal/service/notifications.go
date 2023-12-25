@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"github.com/Verce11o/yata-notifications/internal/lib/grpc_errors"
 	"github.com/Verce11o/yata-notifications/internal/repository"
 	pb "github.com/Verce11o/yata-protos/gen/go/notifications"
+	"github.com/lib/pq"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
@@ -18,17 +22,59 @@ func NewNotificationsService(log *zap.SugaredLogger, tracer trace.Tracer, repo r
 	return &NotificationsService{log: log, tracer: tracer, repo: repo}
 }
 
-func (n NotificationsService) SubscribeToUser(ctx context.Context, request *pb.SubscribeToUserRequest) error {
+func (n *NotificationsService) SubscribeToUser(ctx context.Context, request *pb.SubscribeToUserRequest) error {
 	ctx, span := n.tracer.Start(ctx, "notificationService.SubscribeToUser")
 	defer span.End()
+
+	subscription, err := n.repo.GetUserSubscription(ctx, request.GetUserId(), request.GetToUserId())
+	// todo check to_user_id for existence
+	if !errors.Is(err, sql.ErrNoRows) && err != nil {
+		n.log.Errorf("cannot get user subscription by id %v", err.Error())
+		return err
+	}
+
+	if subscription != nil {
+		n.log.Infof("user already subscribed")
+		return grpc_errors.ErrSubAlreadyExists
+	}
+
+	err = n.repo.SubscribeToUser(ctx, request.GetUserId(), request.GetToUserId())
+
+	if err != nil {
+		n.log.Errorf("cannot subscribe user: %v", err.Error())
+		return err
+	}
 
 	return nil
 
 }
 
-func (n NotificationsService) UnSubscribeFromUser(ctx context.Context, request *pb.UnSubscribeFromUserRequest) error {
+func (n *NotificationsService) UnSubscribeFromUser(ctx context.Context, request *pb.UnSubscribeFromUserRequest) error {
 	ctx, span := n.tracer.Start(ctx, "notificationService.UnSubscribeFromUser")
 	defer span.End()
 
+	err := n.repo.UnSubscribeFromUser(ctx, request.GetUserId(), request.GetToUserId())
+
+	if err != nil {
+		n.log.Errorf("cannot unsubscribe user: %v", err.Error())
+		return err
+	}
+
 	return nil
+}
+
+func parseErr(err error) error {
+	var pgErr *pq.Error
+	ok := errors.As(err, &pgErr)
+
+	if ok && pgErr.Code == "22P02" {
+		return sql.ErrNoRows
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) && err != nil {
+		return err
+	}
+
+	return err
+
 }

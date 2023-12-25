@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"github.com/Verce11o/yata-notifications/config"
+	notificationGRPC "github.com/Verce11o/yata-notifications/internal/handler/grpc"
 	"github.com/Verce11o/yata-notifications/internal/lib/logger"
 	"github.com/Verce11o/yata-notifications/internal/metrics/trace"
 	"github.com/Verce11o/yata-notifications/internal/repository/postgres"
@@ -33,9 +34,9 @@ func Run() {
 		otelgrpc.WithPropagators(propagation.TraceContext{}),
 	)))
 
-	notificationservice := service.Newnotificationservice(log, tracer.Tracer, repo, redisRepo, minioRepo)
+	notificationService := service.NewNotificationsService(log, tracer.Tracer, repo)
 
-	pb.RegisternotificationsServer(s, tweetGrpc.NewTweetGRPC(log, tracer.Tracer, notificationservice))
+	pb.RegisterNotificationsServer(s, notificationGRPC.NewNotificationGRPC(log, tracer.Tracer, notificationService))
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.App.Port))
 

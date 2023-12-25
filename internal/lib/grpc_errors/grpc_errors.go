@@ -13,6 +13,7 @@ var (
 	ErrNotFound         = errors.New("not found")
 	ErrPermissionDenied = errors.New("PermissionDenied")
 	ErrInvalidCursor    = errors.New("invalid pagination cursor")
+	ErrSubAlreadyExists = errors.New("already subscribed")
 )
 
 func ParseGRPCErrStatusCode(err error) codes.Code {
@@ -33,6 +34,8 @@ func ParseGRPCErrStatusCode(err error) codes.Code {
 		return codes.InvalidArgument
 	case errors.Is(err, redis.Nil):
 		return codes.NotFound
+	case errors.Is(err, ErrSubAlreadyExists):
+		return codes.AlreadyExists
 	}
 	return codes.Internal
 }
