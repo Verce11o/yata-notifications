@@ -5,6 +5,16 @@ postgres:
   PostgresqlPassword: password
   PostgresqlDbname: database
 
+rabbitmq:
+  username: vercello
+  password: vercello
+  host: localhost
+  port: 5672
+  exchangeName: tweets-exchange
+  queueName: tweets-queue
+  consumerTag: tweets-consumer
+  bindingKey: tweets-routing-key
+
 metric:
   jaeger:
     endpoint: http://localhost:14268/api/traces
