@@ -7,7 +7,6 @@ import (
 	"github.com/Verce11o/yata-notifications/internal/lib/grpc_errors"
 	"github.com/Verce11o/yata-notifications/internal/repository"
 	pb "github.com/Verce11o/yata-protos/gen/go/notifications"
-	"github.com/lib/pq"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
@@ -38,6 +37,11 @@ func (n *NotificationsService) SubscribeToUser(ctx context.Context, request *pb.
 		return grpc_errors.ErrSubAlreadyExists
 	}
 
+	if request.GetToUserId() == request.GetUserId() {
+		n.log.Errorf("user cannot subscribe to himself")
+		return grpc_errors.ErrInvalidUser
+	}
+
 	err = n.repo.SubscribeToUser(ctx, request.GetUserId(), request.GetToUserId())
 
 	if err != nil {
@@ -61,20 +65,4 @@ func (n *NotificationsService) UnSubscribeFromUser(ctx context.Context, request 
 	}
 
 	return nil
-}
-
-func parseErr(err error) error {
-	var pgErr *pq.Error
-	ok := errors.As(err, &pgErr)
-
-	if ok && pgErr.Code == "22P02" {
-		return sql.ErrNoRows
-	}
-
-	if !errors.Is(err, sql.ErrNoRows) && err != nil {
-		return err
-	}
-
-	return err
-
 }

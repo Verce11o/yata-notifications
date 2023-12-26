@@ -14,6 +14,7 @@ var (
 	ErrPermissionDenied = errors.New("PermissionDenied")
 	ErrInvalidCursor    = errors.New("invalid pagination cursor")
 	ErrSubAlreadyExists = errors.New("already subscribed")
+	ErrInvalidUser      = errors.New("invalid user")
 )
 
 func ParseGRPCErrStatusCode(err error) codes.Code {
@@ -36,6 +37,8 @@ func ParseGRPCErrStatusCode(err error) codes.Code {
 		return codes.NotFound
 	case errors.Is(err, ErrSubAlreadyExists):
 		return codes.AlreadyExists
+	case errors.Is(err, ErrInvalidUser):
+		return codes.InvalidArgument
 	}
 	return codes.Internal
 }
