@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"github.com/Verce11o/yata-notifications/config"
 	notificationGRPC "github.com/Verce11o/yata-notifications/internal/handler/grpc"
-	notificationWS "github.com/Verce11o/yata-notifications/internal/handler/websockets"
 	"github.com/Verce11o/yata-notifications/internal/lib/logger"
 	"github.com/Verce11o/yata-notifications/internal/metrics/trace"
 	"github.com/Verce11o/yata-notifications/internal/repository/postgres"
-	"net/http"
-
 	"github.com/Verce11o/yata-notifications/internal/service"
 	pb "github.com/Verce11o/yata-protos/gen/go/notifications"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -36,10 +33,6 @@ func Run() {
 		otelgrpc.WithPropagators(propagation.TraceContext{}),
 	)))
 
-	// Init WS Handler
-	notificationHandler := notificationWS.NewNotificationWS(log, tracer.Tracer)
-	http.HandleFunc("/ws", notificationHandler.HandleWS)
-
 	notificationService := service.NewNotificationsService(log, tracer.Tracer, repo)
 
 	pb.RegisterNotificationsServer(s, notificationGRPC.NewNotificationGRPC(log, tracer.Tracer, notificationService))
@@ -52,12 +45,6 @@ func Run() {
 
 	go func() {
 		if err := s.Serve(lis); err != nil {
-			log.Infof("error while listen server: %s", err)
-		}
-	}()
-
-	go func() {
-		if err := http.Serve(lis, nil); err != nil {
 			log.Infof("error while listen server: %s", err)
 		}
 	}()

@@ -49,3 +49,45 @@ func (n *NotificationGRPC) UnSubscribeFromUser(ctx context.Context, input *pb.Un
 	return &pb.UnSubscribeFromUserResponse{}, nil
 
 }
+
+func (n *NotificationGRPC) GetNotifications(ctx context.Context, input *pb.GetNotificationsRequest) (*pb.GetNotificationsResponse, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationService.GetNotifications")
+	defer span.End()
+
+	notifications, err := n.service.GetNotifications(ctx, input.GetUserId())
+
+	if err != nil {
+		n.log.Errorf("GetNotifications: %v", err.Error())
+		return nil, status.Errorf(grpc_errors.ParseGRPCErrStatusCode(err), "UnSubscribeFromUser: %v", err)
+	}
+
+	return &pb.GetNotificationsResponse{Notifications: notifications}, nil
+
+}
+func (n *NotificationGRPC) MarkNotificationAsRead(ctx context.Context, input *pb.MarkNotificationAsReadRequest) (*pb.MarkNotificationAsReadResponse, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationService.MarkNotificationAsRead")
+	defer span.End()
+
+	err := n.service.MarkNotificationAsRead(ctx, input.GetUserId(), input.GetNotificationId())
+
+	if err != nil {
+		n.log.Errorf("MarkNotificationAsRead: %v", err.Error())
+		return nil, status.Errorf(grpc_errors.ParseGRPCErrStatusCode(err), "MarkNotificationAsRead: %v", err)
+	}
+
+	return &pb.MarkNotificationAsReadResponse{}, nil
+}
+func (n *NotificationGRPC) ReadAllNotifications(ctx context.Context, input *pb.ReadAllNotificationsRequest) (*pb.ReadAllNotificationsResponse, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationService.ReadAllNotifications")
+	defer span.End()
+
+	err := n.service.ReadAllNotifications(ctx, input.GetUserId())
+
+	if err != nil {
+		n.log.Errorf("ReadAllNotifications: %v", err.Error())
+		return nil, status.Errorf(grpc_errors.ParseGRPCErrStatusCode(err), "ReadAllNotifications: %v", err)
+	}
+
+	return &pb.ReadAllNotificationsResponse{}, nil
+
+}

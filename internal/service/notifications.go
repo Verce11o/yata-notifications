@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/Verce11o/yata-notifications/internal/domain"
 	"github.com/Verce11o/yata-notifications/internal/lib/grpc_errors"
 	"github.com/Verce11o/yata-notifications/internal/repository"
 	pb "github.com/Verce11o/yata-protos/gen/go/notifications"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type NotificationsService struct {
@@ -65,4 +67,72 @@ func (n *NotificationsService) UnSubscribeFromUser(ctx context.Context, request 
 	}
 
 	return nil
+}
+
+func (n *NotificationsService) GetNotifications(ctx context.Context, userID string) ([]*pb.Notification, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationService.GetNotifications")
+	defer span.End()
+
+	notifications, err := n.repo.GetNotifications(ctx, userID)
+
+	if err != nil {
+		n.log.Errorf("cannot get notifications: %v", err.Error())
+		return nil, err
+	}
+
+	var result []*pb.Notification
+	for _, notification := range notifications {
+		result = append(result, &pb.Notification{
+			NotificationId: notification.ID.String(),
+			UserId:         notification.UserID.String(),
+			SenderId:       notification.SenderID.String(),
+			Read:           notification.Read,
+			CreatedAt:      timestamppb.New(notification.CreatedAt),
+		})
+	}
+
+	return result, nil
+}
+
+func (n *NotificationsService) MarkNotificationAsRead(ctx context.Context, userID string, notificationID string) error {
+	ctx, span := n.tracer.Start(ctx, "notificationService.MarkNotificationAsRead")
+	defer span.End()
+
+	err := n.repo.MarkNotificationAsRead(ctx, userID, notificationID)
+
+	if err != nil {
+		n.log.Errorf("cannot mark notification as read: %v", err.Error())
+		return err
+	}
+
+	return err
+}
+
+func (n *NotificationsService) ReadAllNotifications(ctx context.Context, userID string) error {
+	ctx, span := n.tracer.Start(ctx, "notificationService.ReadAllNotifications")
+	defer span.End()
+
+	err := n.repo.ReadAllNotifications(ctx, userID)
+
+	if err != nil {
+		n.log.Errorf("cannot read all notifications: %v", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (n *NotificationsService) AddNotification(ctx context.Context, notification domain.IncomingNewNotification) error {
+	ctx, span := n.tracer.Start(ctx, "notificationService.AddNotification")
+	defer span.End()
+
+	err := n.repo.AddNotification(ctx, notification)
+
+	if err != nil {
+		n.log.Errorf("cannot add new notification: %v", err.Error())
+		return err
+	}
+
+	return nil
+
 }

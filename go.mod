@@ -3,7 +3,7 @@ module github.com/Verce11o/yata-notifications
 go 1.21.3
 
 require (
-	github.com/Verce11o/yata-protos v0.0.0-20231222174513-3f61c2b3b1eb
+	github.com/Verce11o/yata-protos v0.0.0-20231229144701-4fbae6906353
 	github.com/gorilla/websocket v1.5.1
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jmoiron/sqlx v1.3.5
