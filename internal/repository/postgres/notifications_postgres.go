@@ -70,11 +70,11 @@ func (n *NotificationsPostgres) GetUserSubscribers(ctx context.Context, userID s
 	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.GetUserSubscribers")
 	defer span.End()
 
-	q := "SELECT * FROM subscribers WHERE user_id = $1"
+	q := "SELECT user_id, to_user_id, created_at, updated_at FROM subscribers WHERE to_user_id = $1"
 
 	var result []domain.Subscriber
 
-	err := sqlx.SelectContext(ctx, n.db, result, q, userID)
+	err := sqlx.SelectContext(ctx, n.db, &result, q, userID)
 
 	if err != nil {
 		return nil, err
@@ -87,11 +87,11 @@ func (n *NotificationsPostgres) GetNotifications(ctx context.Context, userID str
 	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.GetNotifications")
 	defer span.End()
 
-	q := "SELECT * FROM notifications WHERE user_id = $1 ORDER BY read DESC, created_at DESC LIMIT 30"
+	q := "SELECT * FROM notifications WHERE to_user_id = $1 ORDER BY read DESC, created_at DESC LIMIT 30"
 
 	var result []domain.Notification
 
-	err := sqlx.SelectContext(ctx, n.db, result, q, userID)
+	err := sqlx.SelectContext(ctx, n.db, &result, q, userID)
 
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (n *NotificationsPostgres) MarkNotificationAsRead(ctx context.Context, user
 	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.GetNotifications")
 	defer span.End()
 
-	q := "UPDATE notifications SET read = TRUE WHERE user_id = $1 AND notification_id = $2"
+	q := "UPDATE notifications SET read = TRUE WHERE to_user_id = $1 AND notification_id = $2"
 
 	res, err := n.db.ExecContext(ctx, q, userID, notificationID)
 
@@ -125,7 +125,7 @@ func (n *NotificationsPostgres) ReadAllNotifications(ctx context.Context, userID
 	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.ReadAllNotifications")
 	defer span.End()
 
-	q := "UPDATE notifications SET read = TRUE WHERE user_id = $1"
+	q := "UPDATE notifications SET read = TRUE WHERE to_user_id = $1"
 
 	res, err := n.db.ExecContext(ctx, q, userID)
 
@@ -141,14 +141,28 @@ func (n *NotificationsPostgres) ReadAllNotifications(ctx context.Context, userID
 	return nil
 }
 
-func (n *NotificationsPostgres) AddNotification(ctx context.Context, input domain.IncomingNewNotification) error {
-	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.AddNotification")
+func (n *NotificationsPostgres) BatchAddNotification(ctx context.Context, subscribers []domain.Subscriber, input domain.IncomingNewNotification) error {
+	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.BatchAddNotification")
 	defer span.End()
 
-	q := "INSERT INTO notifications (user_id, sender_id, type) VALUES ($1, $2, $3)"
+	tx, err := n.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
 
-	_, err := n.db.ExecContext(ctx, q, input.UserID, input.SenderID, input.Type)
+	q := "INSERT INTO notifications (to_user_id, from_user_id, type) VALUES ($1, $2, $3)"
 
+	for _, sub := range subscribers {
+		_, err = tx.ExecContext(ctx, q, sub.UserID, input.SenderID, input.Type)
+		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return rollbackErr
+			}
+			return err
+		}
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}

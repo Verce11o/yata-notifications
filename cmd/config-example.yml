@@ -10,10 +10,10 @@ rabbitmq:
   password: vercello
   host: localhost
   port: 5672
-  exchangeName: tweets-exchange
-  queueName: tweets-queue
-  consumerTag: tweets-consumer
-  bindingKey: tweets-routing-key
+  exchangeName: notification-exchange
+  queueName: notification-queue
+  consumerTag: notification-consumer
+  bindingKey: notification-routing-key
 
 metric:
   jaeger:

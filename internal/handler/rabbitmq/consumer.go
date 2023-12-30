@@ -13,12 +13,12 @@ import (
 type NotificationConsumer struct {
 	AmqpConn *amqp.Connection
 	log      *zap.SugaredLogger
-	trace    trace.Tracer
+	tracer   trace.Tracer
 	service  service.Notifications
 }
 
 func NewNotificationConsumer(amqpConn *amqp.Connection, log *zap.SugaredLogger, trace trace.Tracer, service service.Notifications) *NotificationConsumer {
-	return &NotificationConsumer{AmqpConn: amqpConn, log: log, trace: trace, service: service}
+	return &NotificationConsumer{AmqpConn: amqpConn, log: log, tracer: trace, service: service}
 }
 
 func (c *NotificationConsumer) createChannel(exchangeName, queueName, bindingKey string) *amqp.Channel {
@@ -72,7 +72,10 @@ func (c *NotificationConsumer) createChannel(exchangeName, queueName, bindingKey
 
 }
 
-func (c *NotificationConsumer) StartConsumer(ctx context.Context, queueName, consumerTag, exchangeName, bindingKey string) error {
+func (c *NotificationConsumer) StartConsumer(queueName, consumerTag, exchangeName, bindingKey string) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	ch := c.createChannel(exchangeName, queueName, bindingKey)
 	defer ch.Close()
 
@@ -111,23 +114,30 @@ func (c *NotificationConsumer) worker(ctx context.Context, index int, messages <
 
 		if err != nil {
 			c.log.Errorf("failed to unmarshal request: %v", err)
-			c.nack(message)
+			if err := message.Nack(false, false); err != nil {
+				c.log.Errorf("cannot nack message: %v", err)
+			}
 			return
 		}
 
 		subscribers, err := c.service.GetUserSubscribers(ctx, request.SenderID.String())
+		c.log.Debugf("%#v", subscribers)
 
 		if err != nil {
 			c.log.Errorf("failed to get user subscribers: %v", err)
-			c.nack(message)
+			if err := message.Nack(false, false); err != nil {
+				c.log.Errorf("cannot nack message: %v", err)
+			}
 			return
 		}
 
-		err = c.service.AddNotification(context.Background(), request)
+		err = c.service.BatchAddNotification(ctx, subscribers, request)
 
 		if err != nil {
 			c.log.Errorf("failed to add notification: %v", err)
-			c.nack(message)
+			if err := message.Nack(false, false); err != nil {
+				c.log.Errorf("cannot nack message: %v", err)
+			}
 			return
 		}
 
@@ -139,10 +149,4 @@ func (c *NotificationConsumer) worker(ctx context.Context, index int, messages <
 
 	}
 	c.log.Info("Channel closed")
-}
-
-func (c *NotificationConsumer) nack(message amqp.Delivery) {
-	if err := message.Nack(false, false); err != nil {
-		c.log.Errorf("cannot nack message: %v", err)
-	}
 }

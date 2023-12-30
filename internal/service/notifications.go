@@ -83,9 +83,9 @@ func (n *NotificationsService) GetNotifications(ctx context.Context, userID stri
 	var result []*pb.Notification
 	for _, notification := range notifications {
 		result = append(result, &pb.Notification{
-			NotificationId: notification.ID.String(),
-			UserId:         notification.UserID.String(),
-			SenderId:       notification.SenderID.String(),
+			NotificationId: notification.NotificationID.String(),
+			UserId:         notification.ToUserID.String(),
+			SenderId:       notification.FromUserID.String(),
 			Read:           notification.Read,
 			CreatedAt:      timestamppb.New(notification.CreatedAt),
 		})
@@ -122,11 +122,24 @@ func (n *NotificationsService) ReadAllNotifications(ctx context.Context, userID 
 	return nil
 }
 
-func (n *NotificationsService) AddNotification(ctx context.Context, notification domain.IncomingNewNotification) error {
-	ctx, span := n.tracer.Start(ctx, "notificationService.AddNotification")
+func (n *NotificationsService) GetUserSubscribers(ctx context.Context, userID string) ([]domain.Subscriber, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationService.GetUserSubscribers")
 	defer span.End()
 
-	err := n.repo.AddNotification(ctx, notification)
+	subs, err := n.repo.GetUserSubscribers(ctx, userID)
+	if err != nil {
+		n.log.Errorf("cannot get user subscribers: %v", err.Error())
+		return nil, err
+	}
+
+	return subs, nil
+}
+
+func (n *NotificationsService) BatchAddNotification(ctx context.Context, subscribers []domain.Subscriber, notification domain.IncomingNewNotification) error {
+	ctx, span := n.tracer.Start(ctx, "notificationService.BatchAddNotification")
+	defer span.End()
+
+	err := n.repo.BatchAddNotification(ctx, subscribers, notification)
 
 	if err != nil {
 		n.log.Errorf("cannot add new notification: %v", err.Error())

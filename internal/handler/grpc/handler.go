@@ -64,6 +64,7 @@ func (n *NotificationGRPC) GetNotifications(ctx context.Context, input *pb.GetNo
 	return &pb.GetNotificationsResponse{Notifications: notifications}, nil
 
 }
+
 func (n *NotificationGRPC) MarkNotificationAsRead(ctx context.Context, input *pb.MarkNotificationAsReadRequest) (*pb.MarkNotificationAsReadResponse, error) {
 	ctx, span := n.tracer.Start(ctx, "notificationService.MarkNotificationAsRead")
 	defer span.End()
@@ -77,6 +78,7 @@ func (n *NotificationGRPC) MarkNotificationAsRead(ctx context.Context, input *pb
 
 	return &pb.MarkNotificationAsReadResponse{}, nil
 }
+
 func (n *NotificationGRPC) ReadAllNotifications(ctx context.Context, input *pb.ReadAllNotificationsRequest) (*pb.ReadAllNotificationsResponse, error) {
 	ctx, span := n.tracer.Start(ctx, "notificationService.ReadAllNotifications")
 	defer span.End()
