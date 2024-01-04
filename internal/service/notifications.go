@@ -28,7 +28,6 @@ func (n *NotificationsService) SubscribeToUser(ctx context.Context, request *pb.
 	defer span.End()
 
 	subscription, err := n.repo.GetUserSubscription(ctx, request.GetUserId(), request.GetToUserId())
-	// todo check to_user_id for existence
 	if !errors.Is(err, sql.ErrNoRows) && err != nil {
 		n.log.Errorf("cannot get user subscription by id %v", err.Error())
 		return err
@@ -80,7 +79,8 @@ func (n *NotificationsService) GetNotifications(ctx context.Context, userID stri
 		return nil, err
 	}
 
-	var result []*pb.Notification
+	result := make([]*pb.Notification, 0, len(notifications))
+
 	for _, notification := range notifications {
 		result = append(result, &pb.Notification{
 			NotificationId: notification.NotificationID.String(),
@@ -88,6 +88,7 @@ func (n *NotificationsService) GetNotifications(ctx context.Context, userID stri
 			SenderId:       notification.FromUserID.String(),
 			Read:           notification.Read,
 			CreatedAt:      timestamppb.New(notification.CreatedAt),
+			Type:           notification.Type,
 		})
 	}
 
@@ -98,10 +99,20 @@ func (n *NotificationsService) MarkNotificationAsRead(ctx context.Context, userI
 	ctx, span := n.tracer.Start(ctx, "notificationService.MarkNotificationAsRead")
 	defer span.End()
 
-	err := n.repo.MarkNotificationAsRead(ctx, userID, notificationID)
+	notification, err := n.repo.GetNotificationByID(ctx, userID, notificationID)
+	if err != nil {
+		n.log.Errorf("cannot get notification by id: %v", err)
+		return err
+	}
+
+	if notification.ToUserID.String() != userID {
+		return grpc_errors.ErrPermissionDenied
+	}
+
+	err = n.repo.MarkNotificationAsRead(ctx, userID, notificationID)
 
 	if err != nil {
-		n.log.Errorf("cannot mark notification as read: %v", err.Error())
+		n.log.Errorf("cannot mark notification as read: %v", err)
 		return err
 	}
 

@@ -169,3 +169,24 @@ func (n *NotificationsPostgres) BatchAddNotification(ctx context.Context, subscr
 
 	return nil
 }
+
+func (n *NotificationsPostgres) GetNotificationByID(ctx context.Context, userID string, notificationID string) (domain.Notification, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.GetNotificationByID")
+	defer span.End()
+
+	q := "SELECT * FROM notifications WHERE notification_id = $1 AND to_user_id = $2"
+
+	var notification domain.Notification
+
+	err := n.db.QueryRowxContext(ctx, q, notificationID, userID).StructScan(&notification)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Notification{}, sql.ErrNoRows
+	}
+
+	if err != nil {
+		return domain.Notification{}, err
+	}
+
+	return notification, nil
+}

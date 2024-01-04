@@ -11,7 +11,7 @@ import (
 var (
 	ErrAddMinio         = errors.New("add file error")
 	ErrNotFound         = errors.New("not found")
-	ErrPermissionDenied = errors.New("PermissionDenied")
+	ErrPermissionDenied = errors.New("permission denied")
 	ErrInvalidCursor    = errors.New("invalid pagination cursor")
 	ErrSubAlreadyExists = errors.New("already subscribed")
 	ErrInvalidUser      = errors.New("invalid user")
