@@ -17,10 +17,11 @@ type NotificationsService struct {
 	log    *zap.SugaredLogger
 	tracer trace.Tracer
 	repo   repository.Repository
+	redis  repository.RedisRepository
 }
 
-func NewNotificationsService(log *zap.SugaredLogger, tracer trace.Tracer, repo repository.Repository) *NotificationsService {
-	return &NotificationsService{log: log, tracer: tracer, repo: repo}
+func NewNotificationsService(log *zap.SugaredLogger, tracer trace.Tracer, repo repository.Repository, redis repository.RedisRepository) *NotificationsService {
+	return &NotificationsService{log: log, tracer: tracer, repo: repo, redis: redis}
 }
 
 func (n *NotificationsService) SubscribeToUser(ctx context.Context, request *pb.SubscribeToUserRequest) error {
@@ -72,6 +73,15 @@ func (n *NotificationsService) GetNotifications(ctx context.Context, userID stri
 	ctx, span := n.tracer.Start(ctx, "notificationService.GetNotifications")
 	defer span.End()
 
+	cachedNotifications, err := n.redis.GetNotificationsByUserID(ctx, userID)
+	if err != nil {
+		n.log.Errorf("cannot get cached notifications: %v", err.Error())
+	}
+
+	if cachedNotifications != nil {
+		return domainToPb(cachedNotifications), nil
+	}
+
 	notifications, err := n.repo.GetNotifications(ctx, userID)
 
 	if err != nil {
@@ -79,20 +89,11 @@ func (n *NotificationsService) GetNotifications(ctx context.Context, userID stri
 		return nil, err
 	}
 
-	result := make([]*pb.Notification, 0, len(notifications))
-
-	for _, notification := range notifications {
-		result = append(result, &pb.Notification{
-			NotificationId: notification.NotificationID.String(),
-			UserId:         notification.ToUserID.String(),
-			SenderId:       notification.FromUserID.String(),
-			Read:           notification.Read,
-			CreatedAt:      timestamppb.New(notification.CreatedAt),
-			Type:           notification.Type,
-		})
+	if err := n.redis.SetNotificationsByUserID(ctx, userID, notifications); err != nil {
+		n.log.Errorf("cannot set notifications in redis: %v", err.Error())
 	}
 
-	return result, nil
+	return domainToPb(notifications), nil
 }
 
 func (n *NotificationsService) MarkNotificationAsRead(ctx context.Context, userID string, notificationID string) error {
@@ -116,6 +117,13 @@ func (n *NotificationsService) MarkNotificationAsRead(ctx context.Context, userI
 		return err
 	}
 
+	err = n.redis.DeleteNotificationsByUserID(ctx, userID)
+
+	if err != nil {
+		n.log.Errorf("cannot delete notificaion in redis")
+		return err
+	}
+
 	return err
 }
 
@@ -130,6 +138,11 @@ func (n *NotificationsService) ReadAllNotifications(ctx context.Context, userID 
 		return err
 	}
 
+	err = n.redis.DeleteNotificationsByUserID(ctx, userID)
+	if err != nil {
+		n.log.Errorf("cannot delete notificaion in redis")
+		return err
+	}
 	return nil
 }
 
@@ -157,6 +170,29 @@ func (n *NotificationsService) BatchAddNotification(ctx context.Context, subscri
 		return err
 	}
 
+	for _, sub := range subscribers {
+		if err := n.redis.DeleteNotificationsByUserID(ctx, sub.UserID); err != nil {
+			n.log.Errorf("cannot delete user notification cache: %v", err.Error())
+			return err
+		}
+	}
+
 	return nil
 
+}
+
+func domainToPb(notifications []domain.Notification) []*pb.Notification {
+	result := make([]*pb.Notification, 0, len(notifications))
+
+	for _, notification := range notifications {
+		result = append(result, &pb.Notification{
+			NotificationId: notification.NotificationID.String(),
+			UserId:         notification.ToUserID.String(),
+			SenderId:       notification.FromUserID.String(),
+			Read:           notification.Read,
+			CreatedAt:      timestamppb.New(notification.CreatedAt),
+			Type:           notification.Type,
+		})
+	}
+	return result
 }

@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	Postgres PostgresConfig `yaml:"postgres"`
+	Redis    RedisConfig    `yaml:"redis"`
 	RabbitMQ RabbitMQ       `yaml:"rabbitmq"`
 	App      App            `yaml:"app"`
 	Metrics  Metrics        `yaml:"metrics"`
@@ -18,6 +19,14 @@ type PostgresConfig struct {
 	User     string `yaml:"PostgresqlUser" env:"POSTGRESQL_USERNAME"`
 	Password string `yaml:"PostgresqlPassword" env:"POSTGRESQL_PASSWORD"`
 	Name     string `yaml:"PostgresqlDbname" env:"POSTGRESQL_NAME"`
+}
+
+type RedisConfig struct {
+	Host     string `yaml:"RedisHost" env:"REDISHOST"`
+	Port     string `yaml:"RedisPort" env:"REDISPORT"`
+	User     string `yaml:"RedisUser" env:"REDISUSER"`
+	Password string `yaml:"RedisPassword" env:"REDISPASSWORD"`
+	DB       int    `yaml:"RedisDB" env:"REDISDB"`
 }
 
 type RabbitMQ struct {
