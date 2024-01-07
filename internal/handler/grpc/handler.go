@@ -22,7 +22,7 @@ func NewNotificationGRPC(log *zap.SugaredLogger, tracer trace.Tracer, service se
 }
 
 func (n *NotificationGRPC) SubscribeToUser(ctx context.Context, input *pb.SubscribeToUserRequest) (*pb.SubscribeToUserResponse, error) {
-	ctx, span := n.tracer.Start(ctx, "notificationService.SubscribeToUser")
+	ctx, span := n.tracer.Start(ctx, "GRPC.SubscribeToUser")
 	defer span.End()
 
 	err := n.service.SubscribeToUser(ctx, input)
@@ -36,7 +36,7 @@ func (n *NotificationGRPC) SubscribeToUser(ctx context.Context, input *pb.Subscr
 }
 
 func (n *NotificationGRPC) UnSubscribeFromUser(ctx context.Context, input *pb.UnSubscribeFromUserRequest) (*pb.UnSubscribeFromUserResponse, error) {
-	ctx, span := n.tracer.Start(ctx, "notificationService.UnSubscribeFromUser")
+	ctx, span := n.tracer.Start(ctx, "GRPC.UnSubscribeFromUser")
 	defer span.End()
 
 	err := n.service.UnSubscribeFromUser(ctx, input)
@@ -50,8 +50,26 @@ func (n *NotificationGRPC) UnSubscribeFromUser(ctx context.Context, input *pb.Un
 
 }
 
+func (n *NotificationGRPC) GetUserSubscriptions(ctx context.Context, input *pb.GetUserSubscriptionsRequest) (*pb.GetUserSubscriptionsResponse, error) {
+	ctx, span := n.tracer.Start(ctx, "GRPC.NotificationGRPC")
+	defer span.End()
+
+	subscriptions, cursor, err := n.service.GetUserSubscriptions(ctx, input.GetUserId(), input.GetCursor())
+
+	if err != nil {
+		n.log.Errorf("GetUserSubscriptions: %v", err.Error())
+		return nil, status.Errorf(grpc_errors.ParseGRPCErrStatusCode(err), "GetUserSubscriptions: %v", err)
+	}
+
+	return &pb.GetUserSubscriptionsResponse{
+		Subscribers: subscriptions,
+		Cursor:      cursor,
+	}, nil
+
+}
+
 func (n *NotificationGRPC) GetNotifications(ctx context.Context, input *pb.GetNotificationsRequest) (*pb.GetNotificationsResponse, error) {
-	ctx, span := n.tracer.Start(ctx, "notificationService.GetNotifications")
+	ctx, span := n.tracer.Start(ctx, "GRPC.GetNotifications")
 	defer span.End()
 
 	notifications, err := n.service.GetNotifications(ctx, input.GetUserId())
@@ -66,7 +84,7 @@ func (n *NotificationGRPC) GetNotifications(ctx context.Context, input *pb.GetNo
 }
 
 func (n *NotificationGRPC) MarkNotificationAsRead(ctx context.Context, input *pb.MarkNotificationAsReadRequest) (*pb.MarkNotificationAsReadResponse, error) {
-	ctx, span := n.tracer.Start(ctx, "notificationService.MarkNotificationAsRead")
+	ctx, span := n.tracer.Start(ctx, "GRPC.MarkNotificationAsRead")
 	defer span.End()
 
 	err := n.service.MarkNotificationAsRead(ctx, input.GetUserId(), input.GetNotificationId())
@@ -80,7 +98,7 @@ func (n *NotificationGRPC) MarkNotificationAsRead(ctx context.Context, input *pb
 }
 
 func (n *NotificationGRPC) ReadAllNotifications(ctx context.Context, input *pb.ReadAllNotificationsRequest) (*pb.ReadAllNotificationsResponse, error) {
-	ctx, span := n.tracer.Start(ctx, "notificationService.ReadAllNotifications")
+	ctx, span := n.tracer.Start(ctx, "GRPC.ReadAllNotifications")
 	defer span.End()
 
 	err := n.service.ReadAllNotifications(ctx, input.GetUserId())

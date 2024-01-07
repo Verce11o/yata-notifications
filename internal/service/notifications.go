@@ -79,7 +79,7 @@ func (n *NotificationsService) GetNotifications(ctx context.Context, userID stri
 	}
 
 	if cachedNotifications != nil {
-		return domainToPb(cachedNotifications), nil
+		return domainToNotificationPb(cachedNotifications), nil
 	}
 
 	notifications, err := n.repo.GetNotifications(ctx, userID)
@@ -93,7 +93,7 @@ func (n *NotificationsService) GetNotifications(ctx context.Context, userID stri
 		n.log.Errorf("cannot set notifications in redis: %v", err.Error())
 	}
 
-	return domainToPb(notifications), nil
+	return domainToNotificationPb(notifications), nil
 }
 
 func (n *NotificationsService) MarkNotificationAsRead(ctx context.Context, userID string, notificationID string) error {
@@ -159,6 +159,19 @@ func (n *NotificationsService) GetUserSubscribers(ctx context.Context, userID st
 	return subs, nil
 }
 
+func (n *NotificationsService) GetUserSubscriptions(ctx context.Context, userID string, cursor string) ([]*pb.Subscriber, string, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationService.GetUserSubscriptions")
+	defer span.End()
+
+	subscriptions, cursor, err := n.repo.GetUserSubscriptions(ctx, userID, cursor)
+	if err != nil {
+		n.log.Errorf("cannot get user subscriptions: %v", err.Error())
+		return nil, "", err
+	}
+
+	return domainToSubscriberPb(subscriptions), cursor, nil
+}
+
 func (n *NotificationsService) BatchAddNotification(ctx context.Context, subscribers []domain.Subscriber, notification domain.IncomingNewNotification) error {
 	ctx, span := n.tracer.Start(ctx, "notificationService.BatchAddNotification")
 	defer span.End()
@@ -181,7 +194,7 @@ func (n *NotificationsService) BatchAddNotification(ctx context.Context, subscri
 
 }
 
-func domainToPb(notifications []domain.Notification) []*pb.Notification {
+func domainToNotificationPb(notifications []domain.Notification) []*pb.Notification {
 	result := make([]*pb.Notification, 0, len(notifications))
 
 	for _, notification := range notifications {
@@ -192,6 +205,19 @@ func domainToPb(notifications []domain.Notification) []*pb.Notification {
 			Read:           notification.Read,
 			CreatedAt:      timestamppb.New(notification.CreatedAt),
 			Type:           notification.Type,
+		})
+	}
+	return result
+}
+
+func domainToSubscriberPb(subscribers []domain.Subscriber) []*pb.Subscriber {
+	result := make([]*pb.Subscriber, 0, len(subscribers))
+
+	for _, subscriber := range subscribers {
+		result = append(result, &pb.Subscriber{
+			UserId:    subscriber.UserID,
+			ToUserId:  subscriber.ToUserID,
+			CreatedAt: timestamppb.New(subscriber.CreatedAt),
 		})
 	}
 	return result

@@ -31,13 +31,13 @@ func ParseGRPCErrStatusCode(err error) codes.Code {
 		return codes.NotFound
 	case errors.Is(err, ErrPermissionDenied):
 		return codes.PermissionDenied
-	case errors.Is(err, ErrInvalidCursor):
-		return codes.InvalidArgument
 	case errors.Is(err, redis.Nil):
 		return codes.NotFound
 	case errors.Is(err, ErrSubAlreadyExists):
 		return codes.AlreadyExists
 	case errors.Is(err, ErrInvalidUser):
+		return codes.InvalidArgument
+	case errors.Is(err, ErrInvalidCursor):
 		return codes.InvalidArgument
 	}
 	return codes.Internal

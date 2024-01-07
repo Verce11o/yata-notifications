@@ -8,6 +8,7 @@ import (
 type Subscribe interface {
 	SubscribeToUser(ctx context.Context, userID, toUserID string) error
 	GetUserSubscription(ctx context.Context, userID string, toUserID string) (*domain.Subscriber, error)
+	GetUserSubscriptions(ctx context.Context, userID string, cursor string) ([]domain.Subscriber, string, error)
 	UnSubscribeFromUser(ctx context.Context, userID, toUserID string) error
 	GetUserSubscribers(ctx context.Context, userID string) ([]domain.Subscriber, error)
 }

@@ -5,14 +5,21 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/Verce11o/yata-notifications/internal/domain"
+	"github.com/Verce11o/yata-notifications/internal/lib/pagination"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"go.opentelemetry.io/otel/trace"
+	"time"
 )
 
 type NotificationsPostgres struct {
 	db     *sqlx.DB
 	tracer trace.Tracer
 }
+
+const (
+	paginationLimit = 30
+)
 
 func NewNotificationsPostgres(db *sqlx.DB, tracer trace.Tracer) *NotificationsPostgres {
 	return &NotificationsPostgres{db: db, tracer: tracer}
@@ -81,6 +88,42 @@ func (n *NotificationsPostgres) GetUserSubscribers(ctx context.Context, userID s
 	}
 
 	return result, nil
+}
+
+// change add subscribe id field
+func (n *NotificationsPostgres) GetUserSubscriptions(ctx context.Context, userID string, cursor string) ([]domain.Subscriber, string, error) {
+	ctx, span := n.tracer.Start(ctx, "notificationsPostgres.GetUserSubscriptions")
+	defer span.End()
+
+	var createdAt time.Time
+	var subID uuid.UUID
+	var err error
+
+	if cursor != "" {
+		createdAt, subID, err = pagination.DecodeCursor(cursor)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
+	q := "SELECT user_id, to_user_id, created_at, updated_at FROM subscribers WHERE (created_at, id) > ($1, $2) AND user_id = $3 ORDER BY created_at, id LIMIT $4"
+
+	var result []domain.Subscriber
+
+	err = sqlx.SelectContext(ctx, n.db, &result, q, createdAt, subID, paginationLimit)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	var nextCursor string
+
+	if len(result) > 0 {
+		latestCreatedAt := result[len(result)-1].CreatedAt
+		nextCursor = pagination.EncodeCursor(latestCreatedAt, result[len(result)-1].ID)
+	}
+
+	return result, nextCursor, nil
 }
 
 func (n *NotificationsPostgres) GetNotifications(ctx context.Context, userID string) ([]domain.Notification, error) {
